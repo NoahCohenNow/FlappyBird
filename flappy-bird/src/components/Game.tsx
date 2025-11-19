@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { api, LeaderboardEntry, PayoutEntry } from '@/lib/api';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 export default function Game() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -10,6 +13,11 @@ export default function Game() {
     const [isGameStarted, setIsGameStarted] = useState(false);
     const [moonProgress, setMoonProgress] = useState(0);
     const [isMooning, setIsMooning] = useState(false);
+    const [walletAddress, setWalletAddress] = useState<string>('');
+    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
+    const [showPayouts, setShowPayouts] = useState(false);
+    const wallet = useWallet();
 
     useEffect(() => {
         // Load high score from local storage on mount
@@ -17,6 +25,11 @@ export default function Game() {
         if (storedHighScore) {
             setHighScore(parseInt(storedHighScore, 10));
         }
+
+        // Fetch Initial State
+        api.fetchState().then(state => {
+            console.log('Initial Game State:', state);
+        });
     }, []);
 
     useEffect(() => {
@@ -368,6 +381,16 @@ export default function Game() {
                 localStorage.setItem('degen_high_score', currentScore.toString());
                 setHighScore(currentScore);
             }
+
+            // Submit Score
+            const walletAddr = wallet.publicKey?.toBase58() || 'Anonymous';
+            api.submitScore(currentScore, walletAddr).then(() => {
+                console.log('Score submitted');
+                return Promise.all([api.fetchLeaderboard(), api.fetchPayouts()]);
+            }).then(([lb, pay]) => {
+                setLeaderboard(lb);
+                setPayouts(pay);
+            }).catch(err => console.error('Score submission failed:', err));
         }
 
         function loop() {
@@ -564,6 +587,11 @@ export default function Game() {
                 <div>
                     <div>NET WORTH: <span className="text-[#00ff00]">${score}</span></div>
                     <div className="text-xs text-gray-400">HIGH: <span>${highScore}</span></div>
+                    {wallet.publicKey ? (
+                        <div className="text-xs text-gray-500 mt-1">WALLET: {wallet.publicKey.toBase58().substring(0, 8)}...</div>
+                    ) : (
+                        <div className="text-xs text-yellow-400 mt-1">⚠ CONNECT WALLET</div>
+                    )}
                 </div>
                 <div className="text-right flex flex-col items-end">
                     <button
@@ -606,12 +634,16 @@ export default function Game() {
             {!isGameStarted && !isGameOver && (
                 <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center z-20 bg-black/50 backdrop-blur-sm">
                     <h1 className="text-6xl text-green-500 mb-2 tracking-widest drop-shadow-md font-vt323">DEGEN FLAPPY</h1>
-                    <p className="text-gray-400 mb-8 text-xl font-vt323">Tap to Pump the Candle. Avoid the FUD.</p>
+                    <p className="text-gray-400 mb-4 text-xl font-vt323">Tap to Pump the Candle. Avoid the FUD.</p>
+
+                    {/* Wallet Connect Button */}
+                    <div className="mb-4">
+                        <WalletMultiButton className="!bg-[#512da8] !text-white !font-vt323 !text-xl !py-3 !px-6 hover:!bg-[#673ab7] !rounded" />
+                    </div>
+
                     <button
                         className="bg-[#00ff00] text-black border-none py-[15px] px-[40px] text-[2rem] font-vt323 uppercase cursor-pointer shadow-[0_0_15px_#00ff00] rounded hover:scale-105 active:scale-95 transition-all"
                         onClick={() => {
-                            // We need to trigger the game start. 
-                            // Since we can't easily access the internal initGame, we'll dispatch a custom event or just simulate a keypress.
                             window.dispatchEvent(new KeyboardEvent('keydown', { 'code': 'Space' }));
                         }}
                     >
@@ -635,6 +667,63 @@ export default function Game() {
                     >
                         BUY THE DIP
                     </button>
+                </div>
+            )}
+
+            {/* Leaderboard / Payouts Overlay (on Game Over) */}
+            {isGameOver && (
+                <div className="absolute bottom-10 right-10 bg-black/80 border border-gray-700 p-4 rounded text-white font-vt323 z-30 max-h-[300px] overflow-y-auto w-[300px]">
+                    <div className="flex justify-between mb-2 border-b border-gray-600 pb-1">
+                        <h3
+                            className={`text-xl cursor-pointer ${!showPayouts ? 'text-[#ffd700]' : 'text-gray-500'}`}
+                            onClick={() => setShowPayouts(false)}
+                        >
+                            LEADERBOARD
+                        </h3>
+                        <h3
+                            className={`text-xl cursor-pointer ${showPayouts ? 'text-[#00ff00]' : 'text-gray-500'}`}
+                            onClick={() => setShowPayouts(true)}
+                        >
+                            PAYOUTS
+                        </h3>
+                    </div>
+
+                    {!showPayouts ? (
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-gray-400 text-left">
+                                    <th className="pr-4">PLAYER</th>
+                                    <th className="text-right">SCORE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {leaderboard.map((entry, i) => (
+                                    <tr key={i} className={entry.wallet_address === walletAddress ? 'text-[#00ff00]' : ''}>
+                                        <td className="pr-4">{entry.display_name || entry.wallet_address.substring(0, 8) + '...'}</td>
+                                        <td className="text-right">${entry.high_score}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="text-sm">
+                            {payouts.length === 0 ? (
+                                <div className="text-gray-500 text-center py-4">No recent payouts</div>
+                            ) : (
+                                payouts.map((p, i) => (
+                                    <div key={i} className="mb-2 border-b border-gray-800 pb-1 last:border-0">
+                                        <div className="flex justify-between text-[#00ff00]">
+                                            <span>${parseFloat(p.amount_usd.toString()).toFixed(2)}</span>
+                                            <span className="text-gray-400 text-xs">{new Date(p.created_at).toLocaleTimeString()}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 truncate">
+                                            To: {p.wallet_address}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

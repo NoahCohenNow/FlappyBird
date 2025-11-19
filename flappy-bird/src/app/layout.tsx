@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { VT323, Share_Tech_Mono } from "next/font/google";
 import "./globals.css";
+import { WalletContextProvider } from "@/components/WalletProvider";
 
 const vt323 = VT323({
   weight: "400",
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${vt323.variable} ${shareTechMono.variable} font-vt323`}>
-        {children}
+        <WalletContextProvider>
+          {children}
+        </WalletContextProvider>
       </body>
     </html>
   );

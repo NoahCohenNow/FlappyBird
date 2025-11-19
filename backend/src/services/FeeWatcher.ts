@@ -1,15 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { query } from '../db';
 import { PriceService } from './PriceService';
-import { Queue } from 'bullmq';
-
-// BullMQ Queue for threshold evaluation
-export const thresholdQueue = new Queue('evaluate-threshold', {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-  }
-});
+import { EventManager } from './EventManager';
 
 export class FeeWatcher {
   private connection: Connection;
@@ -39,7 +31,7 @@ export class FeeWatcher {
       },
       'confirmed'
     );
-    
+
     // Initial check
     await this.checkRecentTransactions();
   }
@@ -68,16 +60,19 @@ export class FeeWatcher {
         // We look for balance changes for simplicity in this demo.
         const preBalance = tx.meta.preBalances[0]; // Assuming payer is index 0, simplified
         const postBalance = tx.meta.postBalances[0];
-        
+
         // Better approach: Look at postTokenBalances or native balance changes for our specific wallet
         const accountIndex = tx.transaction.message.accountKeys.findIndex(
-            k => k.pubkey.toString() === this.creatorWallet.toString()
+          k => k.pubkey.toString() === this.creatorWallet.toString()
         );
-        
+
         if (accountIndex === -1) continue;
 
         const pre = tx.meta.preBalances[accountIndex];
         const post = tx.meta.postBalances[accountIndex];
+
+        if (pre === undefined || post === undefined) continue;
+
         const amountLamports = post - pre;
 
         if (amountLamports <= 0) continue; // Not a deposit
@@ -98,24 +93,27 @@ export class FeeWatcher {
 
         // Update Aggregate
         await query(
-            `INSERT INTO fee_aggregate (cumulative_usd) VALUES ($1) 
+          `INSERT INTO fee_aggregate (cumulative_usd) VALUES ($1) 
              ON CONFLICT (id) DO UPDATE SET cumulative_usd = fee_aggregate.cumulative_usd + $1`,
-            [amountUsd]
-            // Note: In reality, we'd link to a specific creator_wallet_id. 
-            // For single-tenant demo, we might just have one row or update the first one.
+          [amountUsd]
+          // Note: In reality, we'd link to a specific creator_wallet_id. 
+          // For single-tenant demo, we might just have one row or update the first one.
         );
-        
+
         // Fix for demo: Update the single aggregate row
         await query(
-            `UPDATE fee_aggregate SET cumulative_usd = cumulative_usd + $1 WHERE id = (SELECT id FROM fee_aggregate LIMIT 1)`,
-            [amountUsd]
+          `UPDATE fee_aggregate SET cumulative_usd = cumulative_usd + $1 WHERE id = (SELECT id FROM fee_aggregate LIMIT 1)`,
+          [amountUsd]
         );
-        
+
         // Retrieve the aggregate ID to pass to the job
         const aggResult = await query('SELECT id FROM fee_aggregate LIMIT 1');
         if (aggResult.rows.length > 0) {
-            await thresholdQueue.add('check-threshold', { aggregateId: aggResult.rows[0].id });
+          // Direct call instead of queue
+          await EventManager.checkThreshold(aggResult.rows[0].id);
         }
+        // Add a small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     } catch (err) {
       console.error('Error checking transactions:', err);

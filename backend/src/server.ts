@@ -33,17 +33,17 @@ app.get('/v1/state', async (req, res) => {
   try {
     const aggRes = await query('SELECT cumulative_usd FROM fee_aggregate LIMIT 1');
     const cumulativeUsd = aggRes.rows.length ? parseFloat(aggRes.rows[0].cumulative_usd) : 0;
-    
+
     const eventsRes = await query('SELECT * FROM game_events ORDER BY triggered_at DESC LIMIT 5');
-    
+
     res.json({
       cumulative_usd: cumulativeUsd,
       next_threshold_usd: 500 - (cumulativeUsd % 500), // Simple calc for next milestone
       last_events: eventsRes.rows
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error', details: error.message, stack: error.stack });
   }
 });
 
@@ -60,25 +60,42 @@ app.post('/v1/scores', async (req, res) => {
 
 // GET /v1/leaderboard
 app.get('/v1/leaderboard', async (req, res) => {
-    try {
-        const leaderboard = await ScoreService.getLeaderboard();
-        res.json(leaderboard);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
+  try {
+    const leaderboard = await ScoreService.getLeaderboard();
+    res.json(leaderboard);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /v1/payouts
+app.get('/v1/payouts', async (req, res) => {
+  try {
+    const payouts = await query(`
+      SELECT p.amount_usd, p.amount_sol, p.tx_sig, p.created_at, pl.wallet_address, pl.display_name
+      FROM payouts p
+      JOIN players pl ON p.player_id = pl.id
+      ORDER BY p.created_at DESC
+      LIMIT 10
+    `);
+    res.json(payouts.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // ADMIN: Trigger Daily Payout (Manually for demo)
 app.post('/v1/admin/trigger-payout', async (req, res) => {
-    // In prod: Check Admin Secret Header
-    try {
-        await PayoutService.calculateDailyPayouts();
-        res.json({ success: true, message: 'Payout calculation triggered' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to trigger payouts' });
-    }
+  // In prod: Check Admin Secret Header
+  try {
+    await PayoutService.calculateDailyPayouts();
+    res.json({ success: true, message: 'Payout calculation triggered' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to trigger payouts' });
+  }
 });
 
 app.listen(PORT, () => {

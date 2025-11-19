@@ -4,6 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "init-db": "ts-node scripts/init-db.ts",
+    "seed-db": "ts-node scripts/seed-db.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,14 +22,15 @@
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.6",
     "axios": "^1.13.2",
-    "bullmq": "^5.63.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "ioredis": "^5.8.2",
     "pg": "^8.16.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/bs58": "^4.0.4"
   }
 }
