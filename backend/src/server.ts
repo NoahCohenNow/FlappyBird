@@ -10,7 +10,20 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// CORS configuration to allow Vercel frontend
+const corsOptions = {
+  origin: [
+    'https://flappy-bird-ten-omega.vercel.app',
+    'http://localhost:3000',
+    /\.vercel\.app$/ // Allow all Vercel preview deployments
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
