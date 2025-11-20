@@ -549,6 +549,20 @@ export default function Game() {
 
         // --- Input Handling ---
         const handleInput = (e: Event) => {
+            // Check if target is an interactive element (button, link, etc.)
+            // If so, we want to allow the default browser behavior (click) and NOT trigger game actions
+            const target = e.target as HTMLElement;
+            const isInteractive = target && target.closest && (
+                target.closest('button') || 
+                target.closest('a') || 
+                target.closest('.wallet-adapter-button') ||
+                target.closest('.leaderboard-container')
+            );
+            
+            if (isInteractive && e.type !== 'keydown') {
+                return;
+            }
+
             // If it's a click/touch, only allow it if the game is ALREADY playing or if it's the game over screen (to restart)
             // We do NOT want clicks to start the game from the main menu, because that interferes with UI buttons.
             const isMouseOrTouch = e.type === 'mousedown' || e.type === 'touchstart';
@@ -559,7 +573,10 @@ export default function Game() {
             }
 
             // Prevent default behavior (scrolling, etc.)
-            if (e.cancelable) e.preventDefault();
+            // Only prevent default if it's not an interactive element we just allowed (which we handled above)
+            // But actually, if we returned above, we wouldn't be here.
+            // So we are safe to prevent default here for game interactions.
+            if (e.cancelable && !isInteractive) e.preventDefault();
 
             if (gamePlaying) {
                 if (candle) candle.flap();
@@ -737,7 +754,7 @@ export default function Game() {
 
             {/* Leaderboard / Payouts Overlay (on Game Over) */}
             {isGameOver && (
-                <div className="absolute bottom-10 right-10 bg-black/80 border border-gray-700 p-4 rounded text-white font-vt323 z-30 max-h-[300px] overflow-y-auto w-[300px]">
+                <div className="leaderboard-container absolute bottom-10 right-10 bg-black/80 border border-gray-700 p-4 rounded text-white font-vt323 z-30 max-h-[300px] overflow-y-auto w-[300px]">
                     <div className="flex justify-between mb-2 border-b border-gray-600 pb-1">
                         <h3
                             className={`text-xl cursor-pointer ${!showPayouts ? 'text-[#ffd700]' : 'text-gray-500'}`}
