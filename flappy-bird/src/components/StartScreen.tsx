@@ -38,7 +38,7 @@ export default function StartScreen({
     }, []);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText("Coming Soon");
+        navigator.clipboard.writeText("FSKDkFCCkgw7JLu9EeBkmRG9eik9GQT3ZM8cVtmxpump");
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -57,7 +57,7 @@ export default function StartScreen({
                     >
                         <span className="text-gray-400 font-vt323 text-lg uppercase tracking-wider">CONTRACT ADDRESS:</span>
                         <span className="text-white font-bold font-vt323 text-xl tracking-widest group-hover:text-[#00ff00] transition-colors">
-                            {copied ? "COPIED!" : "COMING SOON"}
+                            {copied ? "COPIED!" : "FSKDkFCCkgw7JLu9EeBkmRG9eik9GQT3ZM8cVtmxpump"}
                         </span>
                         {!copied && (
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-white transition-colors">
