@@ -1,10 +1,10 @@
-# 🕹️ Degen Flappy - Crypto-Themed Flappy Bird Game
+# 🕹️ Flappy Candle - Crypto-Themed Flappy Bird Game
 
 A Next.js-based Flappy Bird game with a crypto/trading twist, featuring Solana wallet integration, real-time leaderboards, and a creator fee reward system.
 
 ## 🎮 Game Overview
 
-**Degen Flappy** is a browser-based arcade game where players control a green candlestick chart through obstacles labeled with crypto-themed FUD (Fear, Uncertainty, Doubt) terms. The game features:
+**Flappy Candle** is a browser-based arcade game where players control a green candlestick chart through obstacles labeled with crypto-themed FUD (Fear, Uncertainty, Doubt) terms. The game features:
 
 - **Crypto-themed gameplay**: Navigate a candlestick through obstacles like "FUD", "SEC", "RUG", "DUMP", etc.
 - **Creator Fees System**: Collect coins (Ξ) to fill up the creator fees bar

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, LeaderboardEntry, PayoutEntry } from '@/lib/api';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import StartScreen from './StartScreen';
 
 export default function Game() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -17,6 +17,9 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
     const [showPayouts, setShowPayouts] = useState(false);
+    const [walletConnected, setWalletConnected] = useState(false);
+    const [userSignedUp, setUserSignedUp] = useState(false);
+    const [isGuest, setIsGuest] = useState(false);
     const wallet = useWallet();
 
     useEffect(() => {
@@ -31,6 +34,50 @@ export default function Game() {
             console.log('Initial Game State:', state);
         });
     }, []);
+
+    // Update wallet connection state
+    useEffect(() => {
+        if (wallet.publicKey) {
+            setWalletAddress(wallet.publicKey.toBase58());
+            setWalletConnected(true);
+            setIsGuest(false); // Reset guest mode if wallet connects
+            // Check if user is already signed up
+            checkUserSignupStatus();
+        } else {
+            setWalletConnected(false);
+            setUserSignedUp(false);
+        }
+    }, [wallet.publicKey]);
+
+    const checkUserSignupStatus = async () => {
+        if (!wallet.publicKey) {
+            setUserSignedUp(false);
+            return;
+        }
+        try {
+            // Check if user exists in the database
+            const state = await api.fetchState();
+            setUserSignedUp(true); // If we can fetch state, user is signed up
+        } catch {
+            setUserSignedUp(false);
+        }
+    };
+
+    const handleSignup = async () => {
+        if (!wallet.publicKey) {
+            alert('Please connect wallet first');
+            return;
+        }
+
+        try {
+            // For now, just mark as signed up. 
+            // In a full implementation, this would verify signature or create user in DB
+            setUserSignedUp(true);
+        } catch (error) {
+            console.error('Signup failed:', error);
+            alert('Signup failed');
+        }
+    };
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -384,6 +431,15 @@ export default function Game() {
 
             // Submit Score
             const walletAddr = wallet.publicKey?.toBase58() || 'Anonymous';
+            
+            if (!wallet.publicKey) {
+                // Guest mode: Don't submit score to backend, or submit as guest if backend supports it
+                console.log('Guest score: ' + currentScore);
+                // Optionally fetch leaderboard just to show it, even if user isn't on it
+                api.fetchLeaderboard().then(setLeaderboard);
+                return;
+            }
+
             api.submitScore(currentScore, walletAddr).then(() => {
                 console.log('Score submitted');
                 return Promise.all([api.fetchLeaderboard(), api.fetchPayouts()]);
@@ -493,20 +549,28 @@ export default function Game() {
 
         // --- Input Handling ---
         const handleInput = (e: Event) => {
+            // If it's a click/touch, only allow it if the game is ALREADY playing or if it's the game over screen (to restart)
+            // We do NOT want clicks to start the game from the main menu, because that interferes with UI buttons.
+            const isMouseOrTouch = e.type === 'mousedown' || e.type === 'touchstart';
+
             if (e.type === 'keydown') {
                 const ke = e as KeyboardEvent;
                 if (ke.code !== 'Space' && ke.code !== 'ArrowUp') return;
             }
-            e.preventDefault();
+
+            // Prevent default behavior (scrolling, etc.)
+            if (e.cancelable) e.preventDefault();
 
             if (gamePlaying) {
                 if (candle) candle.flap();
             } else if (gameOverState) {
-                // Restart
+                // Restart on click or space is fine for Game Over screen
                 initGame();
             } else if (!gamePlaying && !gameOverState) {
-                // Start
-                initGame();
+                // Main Menu: Only start on Space/ArrowUp (which the Start Button simulates), NOT on click/touch
+                if (!isMouseOrTouch) {
+                    initGame();
+                }
             }
         };
 
@@ -632,25 +696,26 @@ export default function Game() {
 
             {/* Start Screen */}
             {!isGameStarted && !isGameOver && (
-                <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center z-20 bg-black/50 backdrop-blur-sm">
-                    <h1 className="text-6xl text-green-500 mb-2 tracking-widest drop-shadow-md font-vt323">DEGEN FLAPPY</h1>
-                    <p className="text-gray-400 mb-4 text-xl font-vt323">Tap to Pump the Candle. Avoid the FUD.</p>
-
-                    {/* Wallet Connect Button */}
-                    <div className="mb-4">
-                        <WalletMultiButton className="!bg-[#512da8] !text-white !font-vt323 !text-xl !py-3 !px-6 hover:!bg-[#673ab7] !rounded" />
-                    </div>
-
-                    <button
-                        className="bg-[#00ff00] text-black border-none py-[15px] px-[40px] text-[2rem] font-vt323 uppercase cursor-pointer shadow-[0_0_15px_#00ff00] rounded hover:scale-105 active:scale-95 transition-all"
-                        onClick={() => {
-                            window.dispatchEvent(new KeyboardEvent('keydown', { 'code': 'Space' }));
-                        }}
-                    >
-                        MINT & START
-                    </button>
-                    <div className="mt-4 text-gray-500 text-sm font-sans">Desktop: Space / Arrow Up / Click | Mobile: Tap Screen</div>
-                </div>
+                <StartScreen 
+                    walletConnected={walletConnected || isGuest}
+                    userSignedUp={userSignedUp || isGuest}
+                    walletAddress={isGuest ? "GUEST PLAYER" : walletAddress}
+                    onSignup={handleSignup}
+                    onStart={() => {
+                        window.dispatchEvent(new KeyboardEvent('keydown', { 'code': 'Space' }));
+                    }}
+                    onPlayFree={() => {
+                        setIsGuest(true);
+                    }}
+                    onDisconnect={() => {
+                        if (isGuest) {
+                            setIsGuest(false);
+                            setWalletAddress('');
+                        } else {
+                            wallet.disconnect();
+                        }
+                    }}
+                />
             )}
 
             {/* Game Over Screen */}

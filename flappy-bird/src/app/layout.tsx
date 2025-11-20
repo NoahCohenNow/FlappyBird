@@ -16,7 +16,7 @@ const shareTechMono = Share_Tech_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flappy Bird: Degen Edition",
+  title: "Flappy Candle: Degen Edition",
   description: "Tap to Pump the Candle. Avoid the FUD.",
 };
 
